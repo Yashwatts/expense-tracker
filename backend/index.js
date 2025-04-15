@@ -7,19 +7,25 @@ require('dotenv').config();
 
 const app = express();
 
-app.use(cors({ origin: 'https://expense-tracker-frontend-pied-chi.vercel.app' }));
+// CORS configuration
+app.use(cors({
+  origin: 'https://expense-tracker-frontend-pied-chi.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
+// MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
+// Schemas
 const userSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 });
-
 const User = mongoose.model('User', userSchema);
 
 const expenseSchema = new mongoose.Schema({
@@ -31,7 +37,6 @@ const expenseSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   recurring: { type: Boolean, default: false },
 });
-
 const Expense = mongoose.model('Expense', expenseSchema);
 
 const budgetSchema = new mongoose.Schema({
@@ -40,9 +45,9 @@ const budgetSchema = new mongoose.Schema({
   budgetAmount: { type: Number, required: true },
   spentAmount: { type: Number, default: 0 },
 });
-
 const Budget = mongoose.model('Budget', budgetSchema);
 
+// Authentication Middleware
 const authMiddleware = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ msg: 'No token provided' });
@@ -57,10 +62,10 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// Signup
 app.post('/api/signup', async (req, res) => {
   const { fullName, email, password } = req.body;
 
-  // Input validation
   if (!fullName || fullName.trim() === '') {
     return res.status(400).json({ msg: 'Full name is required' });
   }
@@ -95,6 +100,7 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
+// Login
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -112,6 +118,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Get Expenses
 app.get('/api/expenses', authMiddleware, async (req, res) => {
   try {
     const expenses = await Expense.find({ userId: req.userId }).sort({ date: -1 });
@@ -122,8 +129,24 @@ app.get('/api/expenses', authMiddleware, async (req, res) => {
   }
 });
 
+// Add Expense
 app.post('/api/expenses', authMiddleware, async (req, res) => {
   const { type, title, amount, category, date, recurring } = req.body;
+  if (!type || !['Expense', 'Income'].includes(type)) {
+    return res.status(400).json({ msg: 'Valid type (Expense or Income) is required' });
+  }
+  if (!title || title.trim() === '') {
+    return res.status(400).json({ msg: 'Title is required' });
+  }
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ msg: 'Amount must be greater than 0' });
+  }
+  if (!category || category.trim() === '') {
+    return res.status(400).json({ msg: 'Category is required' });
+  }
+  if (!date || isNaN(new Date(date).getTime())) {
+    return res.status(400).json({ msg: 'Valid date is required' });
+  }
   try {
     const expense = new Expense({
       userId: req.userId,
@@ -132,7 +155,7 @@ app.post('/api/expenses', authMiddleware, async (req, res) => {
       amount,
       category,
       date,
-      recurring,
+      recurring: recurring || false,
     });
     await expense.save();
     res.status(201).json(expense);
@@ -142,9 +165,25 @@ app.post('/api/expenses', authMiddleware, async (req, res) => {
   }
 });
 
+// Update Expense
 app.put('/api/expenses/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { type, title, amount, category, date, recurring } = req.body;
+  if (!type || !['Expense', 'Income'].includes(type)) {
+    return res.status(400).json({ msg: 'Valid type (Expense or Income) is required' });
+  }
+  if (!title || title.trim() === '') {
+    return res.status(400).json({ msg: 'Title is required' });
+  }
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ msg: 'Amount must be greater than 0' });
+  }
+  if (!category || category.trim() === '') {
+    return res.status(400).json({ msg: 'Category is required' });
+  }
+  if (!date || isNaN(new Date(date).getTime())) {
+    return res.status(400).json({ msg: 'Valid date is required' });
+  }
   try {
     const expense = await Expense.findOne({ _id: id, userId: req.userId });
     if (!expense) return res.status(404).json({ msg: 'Expense not found' });
@@ -154,7 +193,7 @@ app.put('/api/expenses/:id', authMiddleware, async (req, res) => {
     expense.amount = amount;
     expense.category = category;
     expense.date = date;
-    expense.recurring = recurring;
+    expense.recurring = recurring || false;
     await expense.save();
 
     res.json(expense);
@@ -164,6 +203,7 @@ app.put('/api/expenses/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Delete Expense
 app.delete('/api/expenses/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   try {
@@ -178,6 +218,7 @@ app.delete('/api/expenses/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Get Budgets
 app.get('/api/budgets', authMiddleware, async (req, res) => {
   try {
     const budgets = await Budget.find({ userId: req.userId });
@@ -188,12 +229,16 @@ app.get('/api/budgets', authMiddleware, async (req, res) => {
   }
 });
 
+// Add Budget
 app.post('/api/budgets', authMiddleware, async (req, res) => {
   const { name, budgetAmount, spentAmount } = req.body;
-  if (!name || !budgetAmount || budgetAmount <= 0) {
-    return res.status(400).json({ msg: 'Invalid name or budget amount' });
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ msg: 'Name is required' });
   }
-  if (spentAmount < 0) {
+  if (!budgetAmount || budgetAmount <= 0) {
+    return res.status(400).json({ msg: 'Budget amount must be greater than 0' });
+  }
+  if (spentAmount && spentAmount < 0) {
     return res.status(400).json({ msg: 'Spent amount cannot be negative' });
   }
   try {
@@ -211,13 +256,17 @@ app.post('/api/budgets', authMiddleware, async (req, res) => {
   }
 });
 
+// Update Budget
 app.put('/api/budgets/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { name, budgetAmount, spentAmount } = req.body;
-  if (!name || !budgetAmount || budgetAmount <= 0) {
-    return res.status(400).json({ msg: 'Invalid name or budget amount' });
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ msg: 'Name is required' });
   }
-  if (spentAmount < 0) {
+  if (!budgetAmount || budgetAmount <= 0) {
+    return res.status(400).json({ msg: 'Budget amount must be greater than 0' });
+  }
+  if (spentAmount && spentAmount < 0) {
     return res.status(400).json({ msg: 'Spent amount cannot be negative' });
   }
   try {
@@ -236,6 +285,7 @@ app.put('/api/budgets/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Delete Budget
 app.delete('/api/budgets/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   try {
