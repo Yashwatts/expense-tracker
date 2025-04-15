@@ -21,23 +21,33 @@ function Transactions({ user, setUser }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchExpenses();
+
+    const interval = setInterval(fetchExpenses, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchExpenses = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/expenses', {
+      if (!token) {
+        setError('Session expired. Please log in.');
+        navigate('/');
+        return;
+      }
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/expenses`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setExpenses(res.data);
       setFilteredExpenses(res.data);
+      setError('');
     } catch (err) {
       console.error('Error fetching expenses:', err);
-      alert('Failed to fetch transactions. Please try again.');
+      setError(err.response?.data?.msg || 'Failed to fetch transactions.');
     }
   };
 
@@ -89,14 +99,27 @@ function Transactions({ user, setUser }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.title || !formData.amount || formData.amount <= 0 || !formData.category || !formData.date) {
+      setError('Please fill all required fields with valid values');
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in.');
+        navigate('/');
+        return;
+      }
       const payload = {
         ...formData,
         amount: parseFloat(formData.amount),
       };
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/expenses/${editingId}`, payload, {
+        await axios.put(`${process.env.REACT_APP_API_URL}/api/expenses/${editingId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(`${process.env.REACT_APP_API_URL}/api/expenses`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
@@ -110,10 +133,11 @@ function Transactions({ user, setUser }) {
       });
       setEditingId(null);
       setShowForm(false);
+      setError('');
       fetchExpenses();
     } catch (err) {
       console.error('Error saving transaction:', err);
-      alert('Failed to save transaction. Please try again.');
+      setError(err.response?.data?.msg || 'Failed to save transaction.');
     }
   };
 
@@ -128,19 +152,26 @@ function Transactions({ user, setUser }) {
     });
     setEditingId(expense._id);
     setShowForm(true);
+    setError('');
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:5000/api/expenses/${id}`, {
+        if (!token) {
+          setError('Session expired. Please log in.');
+          navigate('/');
+          return;
+        }
+        await axios.delete(`${process.env.REACT_APP_API_URL}/api/expenses/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        setError('');
         fetchExpenses();
       } catch (err) {
         console.error('Error deleting transaction:', err);
-        alert('Failed to delete transaction. Please try again.');
+        setError(err.response?.data?.msg || 'Failed to delete transaction.');
       }
     }
   };
@@ -156,6 +187,7 @@ function Transactions({ user, setUser }) {
     });
     setEditingId(null);
     setShowForm(false);
+    setError('');
   };
 
   const handleLogout = () => {
@@ -218,6 +250,7 @@ function Transactions({ user, setUser }) {
       </nav>
 
       <main className="main-content">
+        {error && <p className="error" style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
         <h2 className="transactions-heading">Transactions</h2>
         <div className="card filter-card">
           <h3>Filter Transactions</h3>
@@ -257,7 +290,13 @@ function Transactions({ user, setUser }) {
           </div>
         </div>
         <div className="card transactions-card">
-          <h3>All Transactions</h3>
+          <div className="transactions-header">
+            <h3>All Transactions</h3>
+            <button className="add-btn" onClick={() => setShowForm(true)}>
+              <FontAwesomeIcon icon={faEdit} />
+              Add Transaction
+            </button>
+          </div>
           {filteredExpenses.length === 0 ? (
             <p className="no-data">No transactions found</p>
           ) : (
@@ -312,7 +351,8 @@ function Transactions({ user, setUser }) {
                 <FontAwesomeIcon icon={faTimes} />
               </button>
               <form className="transaction-form" onSubmit={handleSubmit}>
-                <h3>{editingId ? 'Edit Transaction' : 'Enter Transaction Details'}</h3>
+                <h3>{editingId ? 'Edit Transaction' : 'Add Transaction'}</h3>
+                {error && <p className="error" style={{ color: 'red' }}>{error}</p>}
                 <div className="form-group radio-group">
                   <label>
                     <input
@@ -396,7 +436,7 @@ function Transactions({ user, setUser }) {
                 </div>
                 <div className="form-buttons">
                   <button type="submit" className="submit-btn">
-                    Update Transaction
+                    {editingId ? 'Update Transaction' : 'Add Transaction'}
                   </button>
                 </div>
               </form>
