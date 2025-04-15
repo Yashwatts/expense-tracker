@@ -19,20 +19,27 @@ function Budgets({ user, setUser }) {
 
   useEffect(() => {
     fetchBudgets();
+
+    const interval = setInterval(fetchBudgets, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchBudgets = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-      const res = await axios.get('http://localhost:5000/api/budgets', {
+      if (!token) {
+        setError('Session expired. Please log in.');
+        navigate('/');
+        return;
+      }
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/budgets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setBudgets(res.data);
       setError('');
     } catch (err) {
       console.error('Error fetching budgets:', err);
-      setError('Failed to fetch budgets. Please try again.');
+      setError(err.response?.data?.msg || 'Failed to fetch budgets.');
     }
   };
 
@@ -57,18 +64,22 @@ function Budgets({ user, setUser }) {
     }
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
+      if (!token) {
+        setError('Session expired. Please log in.');
+        navigate('/');
+        return;
+      }
       const payload = {
         name: formData.name,
         budgetAmount: parseFloat(formData.budgetAmount),
         spentAmount: spentAmount,
       };
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/budgets/${editingId}`, payload, {
+        await axios.put(`${process.env.REACT_APP_API_URL}/api/budgets/${editingId}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post('http://localhost:5000/api/budgets', payload, {
+        await axios.post(`${process.env.REACT_APP_API_URL}/api/budgets`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
@@ -83,7 +94,7 @@ function Budgets({ user, setUser }) {
       fetchBudgets();
     } catch (err) {
       console.error('Error saving budget:', err);
-      setError('Failed to save budget. Please try again.');
+      setError(err.response?.data?.msg || 'Failed to save budget.');
     }
   };
 
@@ -102,15 +113,19 @@ function Budgets({ user, setUser }) {
     if (window.confirm('Are you sure you want to delete this budget?')) {
       try {
         const token = localStorage.getItem('token');
-        if (!token) throw new Error('No token found');
-        await axios.delete(`http://localhost:5000/api/budgets/${id}`, {
+        if (!token) {
+          setError('Session expired. Please log in.');
+          navigate('/');
+          return;
+        }
+        await axios.delete(`${process.env.REACT_APP_API_URL}/api/budgets/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setError('');
         fetchBudgets();
       } catch (err) {
         console.error('Error deleting budget:', err);
-        setError('Failed to delete budget. Please try again.');
+        setError(err.response?.data?.msg || 'Failed to delete budget.');
       }
     }
   };
@@ -177,7 +192,7 @@ function Budgets({ user, setUser }) {
 
       <main className="main-content">
         <h2 className="transactions-heading">Budgets</h2>
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error" style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
         <div className="add-budget">
           <button className="add-budget-btn" onClick={() => setShowForm(true)}>
             <FontAwesomeIcon icon={faPlus} />
@@ -244,7 +259,7 @@ function Budgets({ user, setUser }) {
               </button>
               <form className="budget-form" onSubmit={handleSubmit}>
                 <h3>{editingId ? 'Edit Budget' : 'Create New Budget'}</h3>
-                {error && <p className="error">{error}</p>}
+                {error && <p className="error" style={{ color: 'red' }}>{error}</p>}
                 <div className="form-group">
                   <label>Name</label>
                   <input
