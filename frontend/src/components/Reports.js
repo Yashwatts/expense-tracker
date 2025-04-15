@@ -13,21 +13,32 @@ function Reports({ user, setUser }) {
   const [timeRange, setTimeRange] = useState('Last 6 Months');
   const [view, setView] = useState('Overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchExpenses();
+
+    const interval = setInterval(fetchExpenses, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchExpenses = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/expenses', {
+      if (!token) {
+        setError('Session expired. Please log in.');
+        navigate('/');
+        return;
+      }
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/expenses`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setExpenses(res.data);
+      setError('');
     } catch (err) {
       console.error('Error fetching expenses:', err);
+      setError(err.response?.data?.msg || 'Failed to fetch expenses.');
     }
   };
 
@@ -283,8 +294,10 @@ function Reports({ user, setUser }) {
             </Link>
           </li>
           <li>
-            <FontAwesomeIcon icon={faWallet} />
-            <span>Budgets</span>
+            <Link to="/budgets">
+              <FontAwesomeIcon icon={faWallet} />
+              <span>Budgets</span>
+            </Link>
           </li>
         </ul>
         <button className="logout-btn" onClick={handleLogout}>
@@ -295,6 +308,7 @@ function Reports({ user, setUser }) {
 
       {/* Main Content */}
       <main className="main-content">
+        {error && <p className="error" style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
         <h2 className="transactions-heading">Reports</h2>
         <div className="form-group report-filter">
           <select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
