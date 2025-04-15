@@ -32,7 +32,7 @@ function Dashboard({ user, setUser }) {
   const fetchExpenses = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/expenses', {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/expenses`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setExpenses(res.data);
@@ -45,7 +45,7 @@ function Dashboard({ user, setUser }) {
   const fetchBudgets = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/budgets', {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/budgets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setBudgets(res.data);
@@ -72,11 +72,11 @@ function Dashboard({ user, setUser }) {
         amount: parseFloat(formData.amount),
       };
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/expenses/${editingId}`, payload, {
+        await axios.put(`${process.env.REACT_APP_API_URL}/api/expenses/${editingId}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        await axios.post('http://localhost:5000/api/expenses', payload, {
+        await axios.post(`${process.env.REACT_APP_API_URL}/api/expenses`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
@@ -114,7 +114,7 @@ function Dashboard({ user, setUser }) {
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:5000/api/expenses/${id}`, {
+        await axios.delete(`${process.env.REACT_APP_API_URL}/api/expenses/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         fetchExpenses();
